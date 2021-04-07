@@ -9,7 +9,7 @@
 
 
 
-class Sand {			/* define a renderer */
+class Sand {			
 
 
 
@@ -17,9 +17,7 @@ public:
 	int xres, yres, zres;
 
 	float* mg, * vg, * vgb, * vgt, * vgs, * xg, * xgb, * fg;
-	float* mp, * Vp0, * ap, apn, * qp, * qpn, * Bp, * Bpn,
-		 * vp, * vpn, * xp, * xpn, * Cp, * Dp, 
-		FPpt, * dvp, * vbp, * Zp;
+
 
 	
 	float dt = 0.1;
@@ -43,8 +41,14 @@ public:
 	float* w;
 	Eigen::Matrix<float, 3, 1>* wgra;
 
-	Eigen::Matrix<float, 3, 3>* Fp, * Fpn, * FEp, * FEpn, * FPp, FPpn,
-		*FEpt, *FPpt;
+
+	// particle related objects
+	float* mp, * Vp0, * ap, * apn, * qp, * qpn;
+	Eigen::Matrix<float, 3, 3>* Bp, * Bpn, * Fp, * Fpn, * FEp, * FEpn, * FPp, *FPpn,
+		*FEpt, *FPpt, *Cp, *Dp, *Fph, *FEph, *FPph, *gradv, *Zp;
+	Eigen::Matrix<float, 3, 1>* vp, * vpn, *xp, *xpn, *vpb;
+
+
 	Sand(int xRes, int yRes, int zRes, int nparticle, int ngrid);
 
 

@@ -4,6 +4,7 @@
 
 
 typedef Eigen::Matrix<float, 3, 3> matrix;
+typedef Eigen::Matrix<float, 3, 1> vector;
 
 //void initialize_matrix0(matrix m) {
 //	for (int i = 0; i < 9; i++) {
@@ -20,24 +21,102 @@ typedef Eigen::Matrix<float, 3, 3> matrix;
 //};
 //
 
-
+// MN:in progress
 Sand::Sand(int xRes, int yRes, int zRes, int nparticle, int ngrid) {
 	xres = xRes;
 	yres = yRes;
 	zres = zRes;
 	n_particle = nparticle;
 	n_grid = ngrid;
+	initialize();
 }
 
+
+// MN: inprogress
 void
 Sand::initialize() {
 
+	//float* mp, * Vp0, * ap, apn, * qp, * qpn;
+	mp = (float*)malloc(n_particle * sizeof(float));
+	Vp0 = (float*)malloc(n_particle * sizeof(float));
+	ap = (float*)malloc(n_particle * sizeof(float));
+	apn = (float*)malloc(n_particle * sizeof(float));
+	qp = (float*)malloc(n_particle * sizeof(float));
+	qpn = (float*)malloc(n_particle * sizeof(float));
+
+	//Eigen::Matrix<float, 3, 3>* Bp, * Bpn, * Fp, * Fpn, * FEp, * FEpn, * FPp, * FPpn,
+	//	* FEpt, * FPpt, * Cp, * Dp, * Fph, * FEph, * FPph, * gradv;
+	Bp = (matrix*)malloc(n_particle * sizeof(matrix));
+	Bpn = (matrix*)malloc(n_particle * sizeof(matrix));
+	Fp = (matrix*)malloc(n_particle * sizeof(matrix));
+	Fpn = (matrix*)malloc(n_particle * sizeof(matrix));
+	FEp = (matrix*)malloc(n_particle * sizeof(matrix));
+	FEpn = (matrix*)malloc(n_particle * sizeof(matrix));
+	FPp = (matrix*)malloc(n_particle * sizeof(matrix));
+	FPp = (matrix*)malloc(n_particle * sizeof(matrix));
+	FPpn = (matrix*)malloc(n_particle * sizeof(matrix));
+	FEpt = (matrix*)malloc(n_particle * sizeof(matrix));
+	FPpt = (matrix*)malloc(n_particle * sizeof(matrix));
+	Cp = (matrix*)malloc(n_particle * sizeof(matrix));
+	Dp = (matrix*)malloc(n_particle * sizeof(matrix));
+	Fph = (matrix*)malloc(n_particle * sizeof(matrix));
+	FEph = (matrix*)malloc(n_particle * sizeof(matrix));
+	FPph = (matrix*)malloc(n_particle * sizeof(matrix));
+	gradv = (matrix*)malloc(n_particle * sizeof(matrix));
+	Zp = (matrix*)malloc(n_particle * sizeof(matrix));
+
+	//Eigen::Matrix<float, 3, 1>* vp, * vpn, *xp, *xpn, *vpb;
+	vp = (vector*)malloc(n_particle * sizeof(vector));
+	vpn = (vector*)malloc(n_particle * sizeof(vector));
+	xp = (vector*)malloc(n_particle * sizeof(vector));
+	xpn = (vector*)malloc(n_particle * sizeof(vector));
+	vpb = (vector*)malloc(n_particle * sizeof(vector));
+	
+	for (int p = 0; p < n_particle; p++) {
+
+		mp[p] = 0.0;
+		Vp0[p] = 0.0;
+		ap[p] = 0.0;
+		apn[p] = 0.0;
+		qp[p] = 0.0;
+		qpn[p] = 0.0;
+
+		Bp[p] = matrix().Zero();
+		Bpn[p] = matrix().Zero();
+		Fp[p] = matrix().Zero();
+		Fpn[p] = matrix().Zero();
+		FEp[p] = matrix().Zero();
+		FEpn[p] = matrix().Zero();
+		FPp[p] = matrix().Zero();
+		FPp[p] = matrix().Zero();
+		FPpn[p] = matrix().Zero();
+		FEpt[p] = matrix().Zero();
+		FPpt[p] = matrix().Zero();
+		Cp[p] = matrix().Zero();
+		Dp[p] = matrix().Zero();
+		Fph[p] = matrix().Zero();
+		FEph[p] = matrix().Zero();
+		FPph[p] = matrix().Zero();
+		gradv[p] = matrix().Zero();
+		Zp[p] = matrix().Zero();
+
+		vp[p] = vector().Zero();
+		vpn[p] = vector().Zero();
+		xp[p] = vector().Zero();
+		xpn[p] = vector().Zero();
+		vpb[p] = vector().Zero();
+
+	}
 }
 
+
+//MN: inprogress
 int Sand::transer_to_grid() {
 	return EXIT_SUCCESS;
 }
 
+
+//:MN complete
 int Sand::project(const matrix& Sigma, float a, matrix& expH, float& delgam) {
 	Sigma.log();
 	matrix e = Sigma;
@@ -60,6 +139,10 @@ int Sand::project(const matrix& Sigma, float a, matrix& expH, float& delgam) {
 	return EXIT_SUCCESS;
 }
 
+
+
+
+//MN: complete
 int
 Sand::energy_derivative(const matrix& Sigma, 
 	matrix& deriv) {
@@ -69,6 +152,8 @@ Sand::energy_derivative(const matrix& Sigma,
 	return EXIT_SUCCESS;
 }
 
+
+// MN:in progress
 int Sand::force_increment(matrix* F, float b, matrix* f) {
 	matrix* Ap = (matrix*)malloc(n_particle * sizeof(matrix));
 	for (int p = 0; p < n_particle; p++) {
