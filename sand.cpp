@@ -43,7 +43,6 @@ Sand::initialize() {
 	apn = (float*)malloc(n_particle * sizeof(float));
 	qp = (float*)malloc(n_particle * sizeof(float));
 	qpn = (float*)malloc(n_particle * sizeof(float));
-
 	//Eigen::Matrix<float, 3, 3>* Bp, * Bpn, * Fp, * Fpn, * FEp, * FEpn, * FPp, * FPpn,
 	//	* FEpt, * FPpt, * Cp, * Dp, * Fph, * FEph, * FPph, * gradv;
 	Bp = (matrix*)malloc(n_particle * sizeof(matrix));
@@ -72,6 +71,11 @@ Sand::initialize() {
 	xpn = (vector*)malloc(n_particle * sizeof(vector));
 	vpb = (vector*)malloc(n_particle * sizeof(vector));
 	
+	w = (float*)malloc(n_particle * n_grid * sizeof(float));
+	gradw = (vector*)malloc(n_particle * n_grid*sizeof(vector));
+
+	xg = (vector*)malloc(n_grid * sizeof(vector));
+	vgb = (vector*)malloc(n_grid * sizeof(vector));
 	for (int p = 0; p < n_particle; p++) {
 
 		mp[p] = 0.0;
@@ -80,6 +84,7 @@ Sand::initialize() {
 		apn[p] = 0.0;
 		qp[p] = 0.0;
 		qpn[p] = 0.0;
+
 
 		Bp[p] = matrix().Zero();
 		Bpn[p] = matrix().Zero();
@@ -107,6 +112,18 @@ Sand::initialize() {
 		vpb[p] = vector().Zero();
 
 	}
+	for (int p = 0; p < n_particle; p++) {
+		for (int i = 0; i < n_grid; i++) {
+			gradw[p * n_particle + i] = vector().Zero();
+			w[p * n_particle + i] = 0.0;
+		}
+	}
+
+	for (int i = 0; i < n_grid; i++) {
+		xg[i] = vector().Zero();
+		vgb[i] = vector().Zero();
+	}
+
 }
 
 
@@ -115,6 +132,53 @@ int Sand::transer_to_grid() {
 	return EXIT_SUCCESS;
 }
 
+//MN: complete
+int
+Sand::update_particle_state() {
+	for (int p = 0; p < n_particle; p++) {
+		xpn[p] = vector().Zero();
+		matrix T = matrix().Zero();
+		for (int i = 0; i < n_grid; i++) {
+			xpn[p] += w[p*n_particle + i] * 
+				(xg[i] + dt * w[p * n_particle + i]*vgb[i]);
+			T += vgb[i] * gradw[p * n_particle + i].transpose();
+		}
+		FEph[p] = (matrix().Identity() + dt * T) * FEp[p];
+		FPph[p] = FPp[p];
+	}
+	return EXIT_SUCCESS;
+}
+
+
+//MN; complete
+int
+Sand::plasticity_hardening() {
+	for (int p = 0; p < n_particle; p++) {
+		Eigen::JacobiSVD<matrix> svd = FEpn[p].jacobiSvd();
+		matrix U = svd.matrixU();
+		matrix V = svd.matrixV();
+		matrix Sigma = matrix::Zero();
+		for (int i = 0; i < 3; i++)
+			Sigma(i, i) = svd.singularValues()[i];
+		matrix T;
+		float delgam;
+		project(Sigma, ap[p], T, delgam);
+		FEpn[p] = U * T * V.transpose();
+		FPpn[p] = V * T.inverse() * Sigma * V.transpose() * FPph[p];
+		qpn[p] = qp[p] + delgam;
+		float phi = h0 + (h1 * qpn[p] - h3) * exp(-h2*qpn[p]);
+		apn[p] = pow(2 / 3, 0.5) * 2 * sin(phi) / (3 - sin(phi));
+
+	}
+	return EXIT_SUCCESS;
+}
+
+// MN: inprogress
+int
+Sand::friction(Eigen::Matrix<float, 3, 1>* v, Eigen::Matrix<float, 3, 1>* gradv) {
+	
+	return EXIT_SUCCESS;
+}
 
 //:MN complete
 int Sand::project(const matrix& Sigma, float a, matrix& expH, float& delgam) {
@@ -153,11 +217,11 @@ Sand::energy_derivative(const matrix& Sigma,
 }
 
 
-// MN:in progress
-int Sand::force_increment(matrix* F, float b, matrix* f) {
+// MN:complete
+int Sand::force_increment(matrix* F, float b, vector* f) {
 	matrix* Ap = (matrix*)malloc(n_particle * sizeof(matrix));
 	for (int p = 0; p < n_particle; p++) {
-		Eigen::JacobiSVD<matrix> svd = F[0].jacobiSvd();
+		Eigen::JacobiSVD<matrix> svd = F[p].jacobiSvd();
 		float delgam;
 		matrix Sigma = matrix::Zero();
 		for (int i = 0; i < 3; i++)
@@ -171,10 +235,26 @@ int Sand::force_increment(matrix* F, float b, matrix* f) {
 			svd.matrixV().transpose() * Fp[p].transpose();		
 	}
 	for (int i = 0; i < n_grid; i++) {
-		f[i] = matrix::Zero();
+		f[i] = vector::Zero();
 		for (int p = 0; p < n_particle; p++) {
-			f[i] -= dt / mg[i] * Ap[p];
+			f[i] -= dt / mg[i] * (Ap[p]*gradw[p*n_particle+i]);
 		}
+		force_increment(Ap, 1, f);
+	}
+	
+	return EXIT_SUCCESS;
+}
+
+
+//MN: complete
+int Sand::force_increment_vel(vector* v, vector* f) {
+	matrix* Ap = (matrix*)malloc(n_particle * sizeof(matrix));
+	for (int p = 0; p < n_particle; p++) {
+		matrix T = matrix().Zero();
+		for (int i = 0; i < n_grid; i++) {
+			T += v[i] * gradw[p * n_particle + i].transpose();
+		}
+		Ap[p] = (matrix().Identity() + dt * T) * FEp[p];
 	}
 	return EXIT_SUCCESS;
 }

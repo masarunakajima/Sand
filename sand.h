@@ -16,7 +16,7 @@ class Sand {
 public:
 	int xres, yres, zres;
 
-	float* mg, * vg, * vgb, * vgt, * vgs, * xg, * xgb, * fg;
+	float* mg,   * vgt, * vgs,  * xgb, * fg;
 
 
 	
@@ -27,7 +27,7 @@ public:
 	float* rho;
 	float* v;
 	
-	float h0, h1, h3;
+	float h0, h1, h2, h3;
 	float phi;
 	int d = 3;
 	float lambda;
@@ -39,7 +39,8 @@ public:
 	Eigen::Matrix<float, 3, 1> g;
 
 	float* w;
-	Eigen::Matrix<float, 3, 1>* wgra;
+	Eigen::Matrix<float, 3, 1>* xg;
+	Eigen::Matrix<float, 3, 1>* gradw;
 
 
 	// particle related objects
@@ -47,6 +48,8 @@ public:
 	Eigen::Matrix<float, 3, 3>* Bp, * Bpn, * Fp, * Fpn, * FEp, * FEpn, * FPp, *FPpn,
 		*FEpt, *FPpt, *Cp, *Dp, *Fph, *FEph, *FPph, *gradv, *Zp;
 	Eigen::Matrix<float, 3, 1>* vp, * vpn, *xp, *xpn, *vpb;
+
+	Eigen::Matrix<float, 3, 1>* vg, * vgb;
 
 
 	Sand(int xRes, int yRes, int zRes, int nparticle, int ngrid);
@@ -58,12 +61,12 @@ public:
 	int transfer_to_particles();
 	int update_particle_state();
 	int plasticity_hardening();
-	int friction(float* v, float* dv);
+	int friction(Eigen::Matrix<float, 3, 1>* v, Eigen::Matrix<float, 3, 1>* gradv);
 	int grid_collisions(float* v, float* vt);
 	int project(const Eigen::Matrix<float, 3, 3>&Sigma, float a, Eigen::Matrix<float, 3, 3>& expH, float& delgam);
 	int energy_derivative(const Eigen::Matrix<float, 3, 3>& Sigma, Eigen::Matrix<float, 3, 3>&  deriv);
-	int force_increment(Eigen::Matrix<float, 3, 3> * Fp, float b, Eigen::Matrix<float, 3, 3>* fp);
-	int force_increment_vel(float* v, float* Ap);
+	int force_increment(Eigen::Matrix<float, 3, 3> * Fp, float b, Eigen::Matrix<float, 3, 1>* f);
+	int force_increment_vel(Eigen::Matrix<float, 3, 1>* v, Eigen::Matrix<float, 3, 1>* f);
 
 	void initialize();
 
