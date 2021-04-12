@@ -8,7 +8,9 @@ typedef Eigen::Matrix<float, 3, 3> matrix;
 
 int
 main() {
-	Sand sand(100, 100, 100, 100, 100);
+	Sand sand(10, 10, 10, 10, 1, 1);
+	sand.random_initial_positions();
+	sand.update_weight();
 	matrix Sigma = matrix::Identity();
 	Sigma = Sigma * 2;
 	std::cout << Sigma << std::endl;

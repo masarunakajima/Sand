@@ -6,6 +6,19 @@
 typedef Eigen::Matrix<float, 3, 3> matrix;
 typedef Eigen::Matrix<float, 3, 1> vector;
 
+
+int 
+Sand::x2i(vector x) {
+	return x(0) + x(1) * xres + x(2) * xyres;
+}
+void
+Sand::i2x(int i , vector& x) {
+	x(2) = i / xyres*h;
+	x(1) = i - x(2) * xyres;
+	x(1) = x(1)/xres*h;
+	x(0) = i - x(1) * xres - x(2) * xyres;
+	x(0) += h;
+}
 //void initialize_matrix0(matrix m) {
 //	for (int i = 0; i < 9; i++) {
 //		m[i] = 0;
@@ -22,12 +35,15 @@ typedef Eigen::Matrix<float, 3, 1> vector;
 //
 
 // MN:in progress
-Sand::Sand(int xRes, int yRes, int zRes, int nparticle, int ngrid) {
+Sand::Sand(int xRes, int yRes, int zRes, int nparticle, float h_, float dt_) {
 	xres = xRes;
 	yres = yRes;
 	zres = zRes;
+	xyres = xres * yres;
 	n_particle = nparticle;
-	n_grid = ngrid;
+	n_grid = xres * yres * zres;
+	h = h_;
+	dt = dt_;
 	initialize();
 }
 
@@ -75,11 +91,15 @@ Sand::initialize() {
 	gradw = (vector*)malloc(n_particle * n_grid*sizeof(vector));
 
 	xg = (vector*)malloc(n_grid * sizeof(vector));
+	vg = (vector*)malloc(n_grid * sizeof(vector));
 	vgb = (vector*)malloc(n_grid * sizeof(vector));
+	vgt = (vector*)malloc(n_grid * sizeof(vector));
+
+
 	for (int p = 0; p < n_particle; p++) {
 
-		mp[p] = 0.0;
-		Vp0[p] = 0.0;
+		mp[p] = DEFAULT_MASS;
+		Vp0[p] = pow(h,3)*DEFAULT_VOL;
 		ap[p] = 0.0;
 		apn[p] = 0.0;
 		qp[p] = 0.0;
@@ -90,8 +110,8 @@ Sand::initialize() {
 		Bpn[p] = matrix().Zero();
 		Fp[p] = matrix().Zero();
 		Fpn[p] = matrix().Zero();
-		FEp[p] = matrix().Zero();
-		FEpn[p] = matrix().Zero();
+		FEp[p] = matrix().Identity();
+		FEpn[p] = matrix().Identity();
 		FPp[p] = matrix().Zero();
 		FPp[p] = matrix().Zero();
 		FPpn[p] = matrix().Zero();
@@ -107,28 +127,133 @@ Sand::initialize() {
 
 		vp[p] = vector().Zero();
 		vpn[p] = vector().Zero();
-		xp[p] = vector().Zero();
+		
 		xpn[p] = vector().Zero();
 		vpb[p] = vector().Zero();
+
+		
+		xp[p] = vector().Zero();
 
 	}
 	for (int p = 0; p < n_particle; p++) {
 		for (int i = 0; i < n_grid; i++) {
-			gradw[p * n_particle + i] = vector().Zero();
-			w[p * n_particle + i] = 0.0;
+			gradw[p * n_grid + i] = vector().Zero();
+			w[p * n_grid + i] = 0.0;
 		}
 	}
 
 	for (int i = 0; i < n_grid; i++) {
-		xg[i] = vector().Zero();
+	
+		i2x(i, xg[i]);
+		vg[i] = vector().Zero();
 		vgb[i] = vector().Zero();
+		vgt[i] = vector().Zero();
 	}
 
 }
 
+float
+Sand::Nh(float x) {
+	float absx = abs(x);
+	if (absx >= 2){
+		return 0;
+	}
+	else if (0 <= absx < 1) {
+		return 0.5 * pow(absx, 3) - pow(absx, 2) + 2.0 / 3;
+	}
+	else if (1 <= absx < 2) {
+		return (1.0 / 6)* pow(2 - absx, 3);
+	}
 
-//MN: inprogress
+}
+
+float
+Sand::dNh(float x) {
+	float absx = abs(x);
+	float sign = x / absx;
+	if (absx >= 2) {
+		return 0;
+	}
+	else if (0 <= absx < 1) {
+		return 1.5 * pow(absx, 2)*sign - 2*absx*sign;
+	}
+	else if (1 <= absx < 2) {
+		return -0.5* pow(2 - absx, 2)*sign;
+	}
+
+}
+
+void 
+Sand::update_weight() {
+	for (int p = 0; p < n_particle; p++) {
+		for (int i = 0; i < n_grid; i++) {
+			vector dif = xg[i] - xp[p];
+			w[p * n_grid + i] = Nh(dif(0)/h)* Nh(dif(1)/h)* Nh(dif(2) /h);
+			gradw[p * n_grid + i](0) = dNh(dif(0) / h) * Nh(dif(1) / h) * Nh(dif(2) / h) / h;
+			gradw[p * n_grid + i](1) = Nh(dif(0) / h) * dNh(dif(1) / h) * Nh(dif(2) / h) / h;
+			gradw[p * n_grid + i](2) = Nh(dif(0) / h) * Nh(dif(1) / h) * dNh(dif(2) / h) / h;
+		}
+	}
+}
+
+void 
+Sand::random_initial_positions() {
+	for (int p = 0; p < n_particle; p++) {
+		xp[p] = vector().Random();
+		xp[p](0) = (xp[p](0) + 1) / 2 * xres*h;
+		xp[p](1) = (xp[p](1) + 1) / 2 * yres*h;
+		xp[p](2) = (xp[p](2) + 1) / 2 * zres*h;
+	}
+}
+
+//MN: complete
 int Sand::transer_to_grid() {
+	for (int i = 0; i < n_grid; i++) {
+		mg[i] = 0;
+		vg[i] = vector().Zero();
+		for (int p = 0; p < n_particle; p++) {
+			mg[i] += w[p * n_grid + i] * mp[p];
+			vg[i] += w[p * n_grid + i] *
+				mp[p] * (vp[p] + (3 / h ^ 2) * Bp[p] * (xg[i] - xp[p]));			
+		}
+		vg[i] *= (1 / mg[i]);
+	}
+	return EXIT_SUCCESS;
+}
+
+void Sand::get_B(matrix* B) {
+	for (int p = 0; p < n_particle; p++) {
+		B[p] = matrix().Zero();
+		for (int i = 0; i < n_grid; i++) {
+			B[p] += w[p * n_grid + i] * vgt[i] * (xg[i] - xp[p]).transpose();
+		}
+	}
+}
+
+
+//MN:in progress
+int
+Sand::explicit_grid_step() {
+	return EXIT_SUCCESS;
+}
+
+//MN: in progress
+int
+Sand::implicit_grid_step() {
+	return EXIT_SUCCESS;
+}
+
+//MN: complete
+int
+Sand::transfer_to_particles() {
+	for (int p = 0; p < n_particle; p++) {
+		vpn[p] = vector().Zero();
+		Bpn[p] = matrix().Zero();
+		for (int i = 0; i < n_grid; i++) {
+			vpn[p] += w[p * n_grid + i] * vgt[i];
+			Bpn[p] += w[p * n_grid + i] * vgt[i] * (xg[i] - xp[p]).transpose();
+		}
+	}
 	return EXIT_SUCCESS;
 }
 
@@ -140,8 +265,8 @@ Sand::update_particle_state() {
 		matrix T = matrix().Zero();
 		for (int i = 0; i < n_grid; i++) {
 			xpn[p] += w[p*n_particle + i] * 
-				(xg[i] + dt * w[p * n_particle + i]*vgb[i]);
-			T += vgb[i] * gradw[p * n_particle + i].transpose();
+				(xg[i] + dt * w[p * n_grid + i]*vgb[i]);
+			T += vgb[i] * gradw[p * n_grid + i].transpose();
 		}
 		FEph[p] = (matrix().Identity() + dt * T) * FEp[p];
 		FPph[p] = FPp[p];
@@ -177,6 +302,12 @@ Sand::plasticity_hardening() {
 int
 Sand::friction(Eigen::Matrix<float, 3, 1>* v, Eigen::Matrix<float, 3, 1>* gradv) {
 	
+	return EXIT_SUCCESS;
+}
+
+// MN: inprogress
+int
+Sand::grid_collisions(vector* v, vector* vt) {
 	return EXIT_SUCCESS;
 }
 
@@ -237,7 +368,8 @@ int Sand::force_increment(matrix* F, float b, vector* f) {
 	for (int i = 0; i < n_grid; i++) {
 		f[i] = vector::Zero();
 		for (int p = 0; p < n_particle; p++) {
-			f[i] -= dt / mg[i] * (Ap[p]*gradw[p*n_particle+i]);
+			f[i] += - dt / mg[i] * (Ap[p]*gradw[p*n_particle+i]);
+			f[i] += dt * g;
 		}
 		force_increment(Ap, 1, f);
 	}
@@ -252,7 +384,7 @@ int Sand::force_increment_vel(vector* v, vector* f) {
 	for (int p = 0; p < n_particle; p++) {
 		matrix T = matrix().Zero();
 		for (int i = 0; i < n_grid; i++) {
-			T += v[i] * gradw[p * n_particle + i].transpose();
+			T += v[i] * gradw[p * n_grid + i].transpose();
 		}
 		Ap[p] = (matrix().Identity() + dt * T) * FEp[p];
 	}
