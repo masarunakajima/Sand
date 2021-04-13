@@ -41,6 +41,8 @@ Sand::Sand(int xRes, int yRes, int zRes, int nparticle, float h_, float dt_) {
 	zres = zRes;
 	xyres = xres * yres;
 	n_particle = nparticle;
+	col_obst = (int*)malloc(sizeof(int) * 100*n_particle);
+	col_grid = (int*)malloc(sizeof(int) * 100 * n_particle);
 	n_grid = xres * yres * zres;
 	h = h_;
 	dt = dt_;
@@ -161,7 +163,7 @@ Sand::Nh(float x) {
 	else if (0 <= absx < 1) {
 		return 0.5 * pow(absx, 3) - pow(absx, 2) + 2.0 / 3;
 	}
-	else if (1 <= absx < 2) {
+	else{
 		return (1.0 / 6)* pow(2 - absx, 3);
 	}
 
@@ -177,7 +179,7 @@ Sand::dNh(float x) {
 	else if (0 <= absx < 1) {
 		return 1.5 * pow(absx, 2)*sign - 2*absx*sign;
 	}
-	else if (1 <= absx < 2) {
+	else  {
 		return -0.5* pow(2 - absx, 2)*sign;
 	}
 
@@ -300,14 +302,51 @@ Sand::plasticity_hardening() {
 
 // MN: inprogress
 int
-Sand::friction(Eigen::Matrix<float, 3, 1>* v, Eigen::Matrix<float, 3, 1>* gradv) {
-	
+Sand::friction(Eigen::Matrix<float, 3, 1>* v, Eigen::Matrix<float, 3, 1>* dv) {
+	for (int c = 0; c < n_collisions; c++) {
+		int i = col_grid[c];
+		Obstacle& obs =  obstacles[col_obst[c]];
+		vector j = mg[i] *dv[i];
+		vector n = j / j.norm();
+
+		vector vt = vgb[i] - n * (n.adjoint() * v[i]);
+		vector t = vt / vt.norm();
+		v[i] -= std::min(vt.norm(), obs.get_mu()*dv[i].norm())*t;
+
+	}
 	return EXIT_SUCCESS;
 }
 
 // MN: inprogress
 int
-Sand::grid_collisions(vector* v, vector* vt) {
+Sand::grid_collisions(vector* v, vector* vh) {
+	n_collisions = 0;
+	for (int i = 0; i < n_grid; i++) {
+		vh[i] = v[i];
+		for (int b = 0; b < n_obstacles; b++) {
+			vector xh = xg[i] + dt * vh[i];
+			Obstacle& obs = obstacles[b];
+			if ((obs.is_sticky()) && (obs.phi(xg[i]))) {
+				vh[i] = (xh - xg[i]) / dt;
+				//continue;
+			}
+			else {
+				float phi = obs.phi(xh) - 
+					std::min((double)obs.phi(xg[i]), 0.0);
+				if (((obs.is_separating()) && (phi < 0)) ||
+					((obs.is_slipping()) && (obs.phi(xg[i])))) {
+					col_obst[n_collisions] = b;
+					col_grid[n_collisions] = i;
+					n_collisions += 1;
+					vector gp;
+					obs.gradphi(xh, gp);
+					vh[i] = vh[i] - phi * gp / dt;
+					//continue;
+				}
+			}
+		}
+	}
+
 	return EXIT_SUCCESS;
 }
 
@@ -389,4 +428,10 @@ int Sand::force_increment_vel(vector* v, vector* f) {
 		Ap[p] = (matrix().Identity() + dt * T) * FEp[p];
 	}
 	return EXIT_SUCCESS;
+}
+
+
+void 
+Sand::add_obstacle(Obstacle& obs) {
+	obstacles[n_obstacles] = obs;
 }

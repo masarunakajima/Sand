@@ -7,25 +7,29 @@
 #include <iostream>
 #include <unsupported/Eigen/MatrixFunctions>
 #include <Eigen>
+#include <algorithm>
 
 typedef float coord[3];
 #define DEFAULT_MASS 1;
 #define DEFAULT_VOL 0.1;
+#define MAXOBSTACLES 100;
 
 
 
 class Sand {			
 
 
-
 public:
 	int xres, yres, zres;
 	int xyres;
-	float* mg,    * vgs,  * xgb, * fg;
+	float* mg,     * fg;
 
-
-	
-	float dt = 0.1;
+	Obstacle obstacles[100];
+	int n_obstacles = 0;
+	int* col_obst;
+	int* col_grid;
+	int n_collisions = 0;
+	float dt;
 	int h;
 
 	float* sigma;
@@ -42,7 +46,7 @@ public:
 
 
 	float* w;
-	Eigen::Matrix<float, 3, 1>* xg;
+	Eigen::Matrix<float, 3, 1>* xg, *xgb;
 	Eigen::Matrix<float, 3, 1>* gradw;
 
 
@@ -52,12 +56,11 @@ public:
 		*FEpt, *FPpt, *Cp, *Dp, *Fph, *FEph, *FPph, *gradv, *Zp;
 	Eigen::Matrix<float, 3, 1>* vp, * vpn, *xp, *xpn, *vpb;
 
-	Eigen::Matrix<float, 3, 1>* vg, * vgb, * vgt;
+	Eigen::Matrix<float, 3, 1>* vg, * vgb, * vgt, *vgs;
 
 	Eigen::Matrix<float, 3, 1> g = Eigen::Matrix<float, 3, 1>(0, 0, -9.8);
 
 	Sand(int xRes, int yRes, int zRes, int nparticle, float h_, float dt_);
-
 
 
 
@@ -68,7 +71,7 @@ public:
 	int update_particle_state();
 	int plasticity_hardening();
 	int friction(Eigen::Matrix<float, 3, 1>* v, Eigen::Matrix<float, 3, 1>* gradv);
-	int grid_collisions(Eigen::Matrix<float, 3, 1>* v, Eigen::Matrix<float, 3, 1>* vh);
+	int grid_collisions(Eigen::Matrix<float, 3, 1>* v, Eigen::Matrix<float, 3, 1>* dv);
 	int project(const Eigen::Matrix<float, 3, 3>&Sigma, float a, Eigen::Matrix<float, 3, 3>& expH, float& delgam);
 	int energy_derivative(const Eigen::Matrix<float, 3, 3>& Sigma, Eigen::Matrix<float, 3, 3>&  deriv);
 	int force_increment(Eigen::Matrix<float, 3, 3> * Fp, float b, Eigen::Matrix<float, 3, 1>* f);
@@ -85,6 +88,8 @@ public:
 
 	void update_weight();
 	void get_B(Eigen::Matrix<float, 3, 3>* B);
+
+	void add_obstacle(Obstacle& obs);
 
 	//float* lambda;
 	//float* G;
